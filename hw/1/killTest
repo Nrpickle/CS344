@@ -1,0 +1,9 @@
+#!/bin/bash
+
+trap "echo Booh!; exit 0" SIGINT SIGTERM
+
+while : #While true
+do
+  sleep 1 
+  echo "Hi thair."
+done

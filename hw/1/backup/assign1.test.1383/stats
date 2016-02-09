@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+# "stats"
+# Nick McComb
+# Written Jan 2016
+# Gets statistics for a file. 
+#
+#  TODO: Write better description
+#
+
+function wrongParam {
+  echo "Usage: stats {-rows|-cols} [file]"
+  exit 1
+}
+
+# Preforms the math
+# Input to functions:
+# 	-input file string
+#	-disprows (0 or 1)
+#	-dispcols (0 or 1)
+function processData {
+
+numrows=0
+numcols=0
+colindex=0
+rowCounter=0
+
+#Dynamic Variables
+input=$1
+disprows=$2
+dispcols=$3
+
+
+
+while IFS= read -r line
+do
+#  echo "Processed line: $line"
+  itemized_line=$(echo $line | tr "\t" "\n")
+  let "colindex = 0"
+  for x in $itemized_line
+  do
+    #MAIN LOOP PROCESSING
+#    echo "> [$x]"
+    echo -e "$x \t" >> "col$colindex$$"
+    echo -e "$x " >> "row$numrows$$"
+
+    # We only want to count cols for the first row
+    # so we only count when the row count var is 0
+    if [ $numrows -eq 0 ]; then
+      let "numcols++"
+    fi
+    let "colindex++"
+    let "rowCounter++"
+  done
+  
+  rowCounter=0
+  let "numrows++"
+
+done < "$input"
+
+## PROCESS DATA ##
+
+#echo "[Process Rows]"
+#echo "Number of columns: $numcols"
+t=$(expr $numcols - 1)
+rowMedianIndex=$(expr $t / 2)
+#echo "Median Index: $rowMedianIndex"
+
+rowOutputString="Average\tMedian"
+
+#sort the row data
+for (( i=0; i < $numrows; i++ ))
+do
+  t=$(cat "row$i$$" | sort -g)
+  $(echo "$t" > "row$i$$")
+done 
+
+#grab the medians from the rows
+for (( i=0; i < $numrows; i++ ))
+do
+  counter=0
+  rowSum=0
+
+  while IFS= read -r line
+  do
+  
+    #Check for median 
+    if [ $rowMedianIndex -eq $counter ]; then
+      rowMedian=$line
+    fi 
+  
+    rowSum=$(expr $rowSum + $line)
+    let "counter++"
+
+  done < "row$i$$"
+   rowAvg=$(expr $rowSum / $counter) #This specifically avoids the 0indexness of the couter
+   rowOutputString=$(echo -e "$rowOutputString\n$rowAvg\t$rowMedian")
+
+done
+
+if [ $disprows -eq 1 ]; then
+  echo -e "$rowOutputString"
+fi
+
+#echo "[! Processing Cols !]"
+
+#echo "Bash version ${BASH_VERSION}..."
+
+colsMedianOutput=""
+colsAverageOutput=""
+
+for (( i=0; i<$colindex; i++ ))
+do
+  input="col$i$$"
+#  echo "[Target File: $input]"
+  
+  # Sort the col files as we get to them
+  t=$(cat "col$i$$" | sort -g)  # We need to use a temp var to store the sort before we save
+  $(echo "$t" > "col$i$$")
+#    echo "$t" #DEBUG
+
+  # Calculate the median's index (note, index 0)
+  medianIndex=$(expr $numrows / 2)
+  medianIndex=$(expr $medianIndex - 1)
+#  echo "Median index = $medianIndex"
+
+  # Actually loop through all the lines
+  counter=0 #0 indexed counter
+  linesum=0
+  while IFS= read -r line
+  do
+    if [ "$counter" = "$medianIndex" ]; then # This gets executed when we are dealing with the median
+#	echo "found the median, bitch, it's $line"
+	medianValue=$line
+    fi
+    linesum=$(expr $linesum + $line)
+#    echo "read a $line"
+    let "counter++"
+  done < "$input"
+  lineavg=$(expr $linesum / $counter)
+#  echo "Median of line: $medianValue, Average: $lineavg"
+  colsAverageOutput=$(echo -e "$colsAverageOutput$lineavg\t")
+  colsMedianOutput=$(echo -e "$colsMedianOutput$medianValue")
+#  sleep .1
+done
+
+#echo -e "\n\nNumber of columns: $numcols"
+#echo "Number of rows:    $numrows"
+#echo "colindex:          $colindex"
+
+if [ "$dispcols" = 1 ]; then
+  echo "Averages:"
+  echo "$colsAverageOutput"
+  echo "Medians:"
+  echo "$colsMedianOutput"
+fi
+
+#Remove the temp. files
+rm -f col*
+rm -f row*
+
+}
+
+
+# Called when there is a parameter passed (eg. -rows or -cols)
+function checkParamsOne {
+  #check for standard input
+  echo "[checkParamsOne]"
+}
+
+function checkParamsTwo {
+  
+  disprows=0
+  dispcols=0
+  argChar2=$( echo "$1" | head -c 2 | tail -c 1 )
+  if [ "$argChar2" = "c" ]; then
+    dispcols=1
+  elif [ "$argChar2" = "r" ]; then
+    disprows=1
+  else
+    wrongParam
+  fi
+  echo "[Info: cols $dispcols, rows $disprows]"
+  processData $2 $disprows $dispcols
+}
+
+# Actual input processing
+
+if [ "$#" -eq "1" ]
+then
+  echo "[One Param]"
+  checkParamsOne $1
+elif [ "$#" -eq "2" ]
+then
+  echo "[Two Params]"
+  checkParamsTwo $1 $2
+else
+  wrongParam
+fi

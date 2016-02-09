@@ -1,0 +1,269 @@
+#!/bin/bash
+#
+# "stats"
+# Nick McComb | nickmccomb.net
+# Written Jan 2016
+# Gets statistics for a file. 
+#
+#  Short desc:
+#  This file preforms calculations on an NxN matrix of tab split, newline deliminated
+#  data that is input either via standard input or by a file.
+#
+#  USAGE     : stats {-rows|-cols} [file]
+#  example   : ./stats -rows file1
+#  example 2 : cat file1 | ./stats -cols
+#
+#  Sample Output (./stats -cols file2):
+#  Averages:
+#  84      85      83      95
+#  Medians:
+#  86      80      93      92
+#  
+#  Basic algorithm:
+#  1.   Check for proper input
+#  2.   Pre-parse the columns into files
+#  3.   Calculate row medians and averages
+#  3.1  If desired, output row information
+#  4.   Calculate column medians and averages
+#  4.1  If desired, output column information
+#  5.   Clean up temporary files
+#  
+
+#Trap to catch the SIGTERM signal
+  trap "rm -f col*; rm -f row*; exit 1;" SIGINT SIGTERM
+
+#Called when the program wants to exit with an improper call error
+  function wrongParam {
+    logger -s "Usage: stats {-rows|-cols} [file]"
+    exit 1
+  }
+
+# Preforms the math
+# Input to function:
+# 	-input file string
+#	-disprows (0 or 1)
+#	-dispcols (0 or 1)
+
+  function processData {
+
+  numrows=0
+  numcols=0
+  colindex=0
+  rowCounter=0
+
+#Dynamic Variables
+  input=$1
+  disprows=$2
+  dispcols=$3
+
+
+#This loop reads in from the file and pre-processes for both cols and rows
+  while IFS= read -r line
+  do
+    itemized_line=$(echo $line | tr "\t" "\n")
+    let "colindex = 0"
+    for x in $itemized_line
+    do
+      #MAIN LOOP PROCESSING
+      echo -e "$x \t" >> "col$colindex$$"
+      echo -e "$x " >> "row$numrows$$"
+
+      # We only want to count cols for the first row
+      # so we only count when the row count var is 0
+      if [ $numrows -eq 0 ]; then
+	let "numcols++"
+      fi
+      let "colindex++"
+      let "rowCounter++"
+    done
+    
+    rowCounter=0
+    let "numrows++"
+
+  done < "$input"
+
+## PROCESS DATA ##
+
+  t=$(expr $numcols - 1) #temp var
+  rowMedianIndex=$(expr $t / 2)
+#echo "Median Index: $rowMedianIndex"
+
+#Init the row output string with labels
+  rowOutputString="Average\tMedian"
+
+#sort the row data
+  for (( i=0; i < $numrows; i++ ))
+  do
+    t=$(cat "row$i$$" | sort -g)
+    $(echo "$t" > "row$i$$")
+  done 
+
+#Grab the medians from the rows
+  for (( i=0; i < $numrows; i++ ))
+  do
+    counter=0
+    rowSum=0
+
+    while IFS= read -r line
+    do
+    
+      #Check for median 
+      if [ $rowMedianIndex -eq $counter ]; then
+	rowMedian=$line
+      fi 
+    
+      rowSum=$(expr $rowSum + $line)
+      let "counter++"
+
+    done < "row$i$$"
+    
+    #Calculate the current row average
+    rowAvg=$(expr $rowSum / $counter) #This specifically avoids the 0indexness of the couter
+
+    #Calculate the output string for the current row and concatenate with the display holder
+    rowOutputString=$(echo -e "$rowOutputString\n$rowAvg\t$rowMedian")
+
+  done
+
+#Display the row information if requested by the user
+  if [ $disprows -eq 1 ]; then
+    echo -e "$rowOutputString"
+  fi
+
+  colsMedianOutput=""
+  colsAverageOutput=""
+
+#This loop processes the main cols information
+  for (( i=0; i<$colindex; i++ ))
+  do
+    input="col$i$$"
+    
+    # Sort the col files as we get to them
+    t=$(cat "col$i$$" | sort -g)  # We need to use a temp var to store the sort before we save
+    $(echo "$t" > "col$i$$")
+
+    # Calculate the median's index (note, index 0)
+    medianIndex=$(expr $numrows / 2)
+    if [ $medianIndex -ne 0 ]; then
+      medianIndex=$(expr $medianIndex - 1)
+    fi
+
+    # Actually loop through all the lines
+    counter=0 #0 indexed counter
+    linesum=0 #Sum of all the lines
+    
+    #Reads the info in from the col temp files and processes it
+    while IFS= read -r line
+    do
+      if [ "$counter" = "$medianIndex" ]; then # This gets executed when we are dealing with the median
+	  medianValue=$line
+      fi
+      linesum=$(expr $linesum + $line)
+      let "counter++"
+    done < "$input"
+    lineavg=$(expr $linesum / $counter)
+
+    #Concatenate the stings to enable easy viewing
+    colsAverageOutput=$(echo -e "$colsAverageOutput$lineavg\t")
+    colsMedianOutput=$(echo -e "$colsMedianOutput$medianValue")
+  done
+
+#Display the column information if requested by the user
+  if [ "$dispcols" = 1 ]; then
+    echo "Averages:"
+    echo "$colsAverageOutput"
+    echo "Medians:"
+    echo "$colsMedianOutput"
+  fi
+
+#Remove only the temp. files associated with this process
+  find -type f -name "*$$" | xargs rm -f
+
+#Program has run succesfully.
+  exit 0
+
+  }
+
+
+# Called when there is a parameter passed (eg. -rows or -cols)
+  function checkParamsOne {
+
+    #Init Displays
+    disprows=0
+    dispcols=0
+    
+    #Check to ensure that the option has the correct formatting
+    argChar1=$( echo "$1" | head -c 1)
+    if [ "$argChar1" != "-" ]; then
+      wrongParam
+    fi
+    
+    #Find which, if any, option was suppied
+    argChar2=$( echo "$1" | head -c 2 | tail -c 1 )
+    if [ "$argChar2" = "c" ]; then
+      dispcols=1
+    elif [ "$argChar2" = "r" ]; then
+      disprows=1
+    else
+      wrongParam
+    fi
+   
+    #This particular format is used so that it will
+    #get deleted by existing code, with PID appended
+    #for parallel operations
+    colTempFile="colTempFile$$"
+
+    #Read from the standard input
+    stdin=$(cat)
+
+    #Output the standard input to a file (so existing code will work)
+    echo "$stdin" > $colTempFile
+
+    #Process the file that now contains the input
+    processData $colTempFile $disprows $dispcols
+  }
+
+#This function is called if there are two arguments (e.g. -cols file1)
+  function checkParamsTwo {
+    #Init Displays
+    disprows=0
+    dispcols=0
+    
+    #Check to ensure that the option has the correct formatting
+    argChar1=$( echo "$1" | head -c 1)
+    if [ "$argChar1" != "-" ]; then
+      wrongParam
+    fi
+    
+    #Find which, if any, option was suppied
+    argChar2=$( echo "$1" | head -c 2 | tail -c 1 )
+    if [ "$argChar2" = "c" ]; then
+      dispcols=1
+    elif [ "$argChar2" = "r" ]; then
+      disprows=1
+    else
+      wrongParam
+    fi
+    
+    #At this point, we can assume all of the params are valid, so
+    #let's check if the file is valid.
+    if [ -r "$2" ]; then
+      #If the file is valid, then process the data
+      processData $2 $disprows $dispcols
+    else
+      logger -s "Cannot read $2"
+      exit 1
+    fi
+  }
+
+# Actual input processing
+
+  if [ "$#" -eq "1" ]
+  then
+    checkParamsOne $1
+  elif [ "$#" -eq "2" ]
+  then
+    checkParamsTwo $1 $2
+  else
+    wrongParam
+  fi

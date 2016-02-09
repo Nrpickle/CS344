@@ -1,0 +1,8 @@
+#!/bin/bash
+
+stdin=$(cat)
+
+echo $stdin
+
+START=1
+END=5
