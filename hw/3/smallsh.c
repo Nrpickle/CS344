@@ -31,7 +31,7 @@ int main(){
   do{
 
 
-    pid_t cpid;
+    int cpid = 0;
 
     short timeout = 0;
     short rep = 0;
@@ -39,12 +39,39 @@ int main(){
     do{
     do{
       cpid = waitpid(-1, &status, WNOHANG);
-      if(cpid > 1){
-        printf("background pid %d is done: exit value %i\n", cpid, status);
+      if(cpid > 0){ //Then we found a process
+        //if(errno == ECHILD)
+	  //break;
+	if(WIFEXITED(status)){
+          printf("process %d exited",  cpid);
+	}
+	if(WIFSIGNALED(status)){
+          printf("process %d terminated by signal %d", cpid, WTERMSIG(status));
+	}
+
+	printf("\n");
+
+	//if(WIFSIGNALED(status))
+	//  printf("SIGNAL, TERMINATED\n");
+ /*if (WIFEXITED(status)) {
+               printf("child exited, status=%d\n", WEXITSTATUS(status));
+
+
+	               } else if (WIFSIGNALED(status)) {
+			             printf("child killed (signal %d)\n", WTERMSIG(status));
+
+
+i				             }*/
+	/*if(WIFSIGNALED(status)){
+	    printf("background pid %d is done: terminated by signal %i\n", cpid, WEXITSTATUS(status));
+	 }
+	else{
+            printf("background terminated normally\n");
+	}*/
       }
       ++timeout;
       //printf(".");
-      //fflush(stdout);
+      fflush(stdout);
     }while(!cpid && timeout < 1000);
     }while(rep++ < 5);
 
@@ -112,6 +139,7 @@ int main(){
       else {  //We want to use the user's message
         if(chdir(userInputVect[1]) == -1){
           printf("Cannot open directory %s \n", userInputVect[1]);
+	  fflush(stdout);
 	}
       }
       //printf("Target path: _%s_\n", userInputVect[1]);
@@ -119,7 +147,10 @@ int main(){
     }
     if(!strcmp(userInputVect[0], "status")){
       //printf("[#Executing status#]\n"); 
-      printf("exit value %d \n", status);
+      if(status != -3){
+        printf("exit value %d \n", WEXITSTATUS(status));
+        fflush(stdout);
+      }
       continue;
     }
 
@@ -132,7 +163,7 @@ int main(){
     //Check to see if we are piping the process anything
     for(int i = 0; i < userInputCount; i++){
       if(!strcmp(userInputVect[i], "|")){
-        printf("  #Detected pipe\n");
+       // printf("  #Detected pipe\n");
       }
       //printf("Counted input: %d \n", userInputCount);
     }
@@ -190,7 +221,7 @@ int main(){
 
         dup2(null, 1);
 	dup2(readNull, 0);
-	dup2(null, 2);
+	//dup2(null, 2);
 
 	//TODO: disable ctrl sequences
 
@@ -231,7 +262,7 @@ int main(){
       if(setBackground)
         printf("background pid is %d \n", cpid);
       else{
-        cpid = waitpid(-1, &status, 0);
+        cpid = waitpid(cpid, &status, 0);  //we want to wait for the process we just made to exit (because it's fg)
       }
     }
 
@@ -250,7 +281,8 @@ void signalSIGINTHandler(int signum){
 
 void signalSIGTERMHandler(int signum){
   printf("terminated by signal %d\n", signum);
-
+  perror("hi there\n");
+  exit(1);
   signal(SIGTERM, signalSIGTERMHandler);
 }
 
