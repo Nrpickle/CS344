@@ -1,3 +1,39 @@
+/***
+ * Smallsh
+ *
+ * Written by Nick McComb | www.nickmccomb.net
+ * For CS344 (OS I) in February 2016
+ *
+ * This program is a very simple shell program that was used to demonstrate knowledge
+ * of the fork() and exec() family in c. There are three built in commandds (cd, status, 
+ * and exit), and everything else is passed onto the exec command. The shell also supports
+ * file input redirection, file output redirection, and background processes, among other
+ * things. 
+ *
+ * USAGE: ./smallsh
+ *
+ * The  program acceps no command line arguments, and functions as a normal shell when launched
+ *
+ * To type a command in the shell, use the following format:
+ *
+ * command [arg1 arg2 ...] [< input_file] [> output_file] [&]
+ *
+ * COMPILATION
+ *
+ * To compile the program, use the following line (also found in the README file):
+ *
+ * gcc -std=c99 -o smallsh smallsh.c
+ *
+ * PROGRAM ALGORITHM
+ *
+ * 1. CHECK IF ANY PROCESSES NEED TO BE CLEANED UP
+ * 2. GET USER INPUT
+ * 3. CHECK USER INPUT FOR SPECIAL CONDITIONS (background, I/O redirection, etc.)
+ * 4. PROCESS USER INPUT
+ *
+ ***/
+
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,6 +47,7 @@
 #define USER_INPUT_MAX 2048
 #define USER_NUM_ENTRIES 513
 
+//Define our signal handler functions
 void signalSIGINTHandler(int signum);
 void signalSIGTERMHandler(int signum);
 
@@ -28,49 +65,32 @@ int main(){
 
   printf("[Welcome to Small Shell!] \n");
   
+
+  //**MAIN PROGRAM LOOP**
   do{
-
-
-    int cpid = 0;
+    int cpid = 0; //Holds misc. process IDs when needed
 
     short timeout = 0;
     short rep = 0;
 
+    //This weird set of do..while() loops just checks for processes an arbritrary amount of times.
+    //It could definitely be optimized, but it works, so I left it
     do{
     do{
-      cpid = waitpid(-1, &status, WNOHANG);
+      cpid = waitpid(-1, &status, WNOHANG);  //Check for a process
       if(cpid > 0){ //Then we found a process
-        //if(errno == ECHILD)
-	  //break;
-	if(WIFEXITED(status)){
+	if(WIFEXITED(status)){    //If the process exited, then we want to say so
+	                          //Note: only a background process will trip this, because of how the 
+			          //program flow was designed
           printf("process %d exited",  cpid);
 	}
-	if(WIFSIGNALED(status)){
+	if(WIFSIGNALED(status)){  //Print the terminated signal output (also only bg process)
           printf("process %d terminated by signal %d", cpid, WTERMSIG(status));
 	}
-
 	printf("\n");
 
-	//if(WIFSIGNALED(status))
-	//  printf("SIGNAL, TERMINATED\n");
- /*if (WIFEXITED(status)) {
-               printf("child exited, status=%d\n", WEXITSTATUS(status));
-
-
-	               } else if (WIFSIGNALED(status)) {
-			             printf("child killed (signal %d)\n", WTERMSIG(status));
-
-
-i				             }*/
-	/*if(WIFSIGNALED(status)){
-	    printf("background pid %d is done: terminated by signal %i\n", cpid, WEXITSTATUS(status));
-	 }
-	else{
-            printf("background terminated normally\n");
-	}*/
       }
       ++timeout;
-      //printf(".");
       fflush(stdout);
     }while(!cpid && timeout < 1000);
     }while(rep++ < 5);
@@ -84,11 +104,6 @@ i				             }*/
     //Strip the newline character
     userInput[strlen(userInput)-1] = '\0';
 
-    //printf("I recieved the following: %s\n", userInput);
- 
-    
-    //printf("characterCheck: %c \n", userInput[1]);
-    
     //Check for a blank line first
 
     //Check for blank line
@@ -114,19 +129,17 @@ i				             }*/
     short userInputCount = 0;
 
     do{
-      //printf("Length of strtok: %d\n", strlen(tokResult));
-
       userInputVect[userInputCount] = malloc( (strlen(tokResult) + 1) * sizeof(char) );
       strcpy( userInputVect[userInputCount++] , tokResult );
 
-      //printf("Recieved: %s \n", userInputVect[userInputCount - 1]);
-
     }while(tokResult = strtok(NULL, " "));
 
-    //userInputVect[userInputCount] = malloc( sizeof(char) * 2);
     userInputVect[userInputCount] = NULL;
 
     //Check for built in command
+    //Note: there are a lot of program flow breaking 'continues' used in this program
+    //and especially in this part. I deemed it the most elegant way to solve the problem
+
     if(!strcmp(userInputVect[0], "exit"))
       exit(0);
     if(!strcmp(userInputVect[0], "cd")){
@@ -161,6 +174,7 @@ i				             }*/
     }
 
     //Check to see if we are piping the process anything
+    //(this was not implemented in the final program)
     for(int i = 0; i < userInputCount; i++){
       if(!strcmp(userInputVect[i], "|")){
        // printf("  #Detected pipe\n");
@@ -209,6 +223,9 @@ i				             }*/
       }
     }
 
+
+    //Here is where we actually fork off the child process (if we've reached this point)
+
     cpid = fork();
 
     if (cpid == 0){  //Then we are the child
@@ -222,8 +239,6 @@ i				             }*/
         dup2(null, 1);
 	dup2(readNull, 0);
 	//dup2(null, 2);
-
-	//TODO: disable ctrl sequences
 
       }
       else if(inputFilename){ 
@@ -250,13 +265,15 @@ i				             }*/
 	
       }
 
+      //This is the line that executes the desired command ('the core')
       execvp(userInputVect[0], userInputVect);
 
-      //printf("Failed stuffs");
+      //If we've reached this spot, that means the exec command failed.
+
       fprintf(stderr, "smallsh: cannot open %s for input\n", userInputVect[0]);
-      
-      //fputs("smallsh: cannot open for input. \n", stderr);
-      exit(1);
+      fflush(stdout);
+
+      exit(1); //We definitely want to kill the child here
     }
     else{  //Then we are the parent.
       if(setBackground)
@@ -266,7 +283,7 @@ i				             }*/
       }
     }
 
-  }while(1);
+  }while(1); //We want to loop forever, when an exit is desired, then the exit() command will cause it
 }
 
 void signalSIGINTHandler(int signum){
