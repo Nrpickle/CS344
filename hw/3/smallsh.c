@@ -12,15 +12,19 @@
 #define USER_NUM_ENTRIES 513
 
 void signalSIGINTHandler(int signum);
+void signalSIGTERMHandler(int signum);
 
 int main(){
   //**PROGRAM INIT**
   char userInput[USER_INPUT_MAX];
 
   static int status = -3;
-  
+  int backgroundProcessCount = 0;
+  int backgroundPIDs[500];
+
   //Register signal handlers
   signal(SIGINT, signalSIGINTHandler);
+  signal(SIGTERM, signalSIGTERMHandler);
 
   printf("[Welcome to Small Shell!] \n");
   
@@ -36,7 +40,7 @@ int main(){
     do{
       cpid = waitpid(-1, &status, WNOHANG);
       if(cpid > 1){
-        printf("%d exited with exit value %i\n", cpid, status);
+        printf("background pid %d is done: exit value %i\n", cpid, status);
       }
       ++timeout;
       //printf(".");
@@ -99,8 +103,18 @@ int main(){
     if(!strcmp(userInputVect[0], "exit"))
       exit(0);
     if(!strcmp(userInputVect[0], "cd")){
-      //printf("[#Executing change dir#]\n");
-      chdir(userInputVect[1]);
+      //For the next line, it is important to check for the first check first,
+      //otherwise you could SEGMENTATION FAULT
+      if(userInputVect[1] == NULL || strcmp(userInputVect[1], "~/") == 0){
+      //Then we want to change to the home directory
+        chdir(getenv("HOME"));
+      }
+      else {  //We want to use the user's message
+        if(chdir(userInputVect[1]) == -1){
+          printf("Cannot open directory %s \n", userInputVect[1]);
+	}
+      }
+      //printf("Target path: _%s_\n", userInputVect[1]);
       continue;
     }
     if(!strcmp(userInputVect[0], "status")){
@@ -154,7 +168,6 @@ int main(){
     char * inputFilename = NULL;
     for(int lol = 0; lol < userInputCount; lol++){
       if(!strcmp(userInputVect[lol], "<")){//Then we need to do some stuff and things (read from a file)
-	printf("  #READING FROM FILE \n");
 	inputFilename = malloc(sizeof(char) * strlen(userInputVect[lol + 1]));
 	strcpy(inputFilename, userInputVect[lol + 1]);
 
@@ -165,24 +178,6 @@ int main(){
       }
     }
 
-    //pid_t cpid;
-    //static int status = -1;
-
-    /*short timeout = 0;
-    short rep = 0;
-
-    do{
-    do{
-      cpid = waitpid(-1, &status, 0);
-      if(cpid > 1){
-        printf("exit value %i\n", status);
-      }
-      ++timeout;
-      printf(".");
-      fflush(stdout);
-    }while(!cpid && timeout < 1000);
-    }while(rep++ < 5);
-    */
     cpid = fork();
 
     if (cpid == 0){  //Then we are the child
@@ -192,9 +187,6 @@ int main(){
         int null = open("/dev/null", O_RDWR);
 
         int readNull = open("/dev/null", O_RDONLY);
-
-	//printf("null: %d | readNull: %d \n", null, readNull);
-        //fflush(stdout);
 
         dup2(null, 1);
 	dup2(readNull, 0);
@@ -206,12 +198,22 @@ int main(){
       else if(inputFilename){ 
         fd = open( inputFilename, O_RDONLY, 0644);
         
+        if(fd < 0){
+          printf("Cannot open %s for input \n", inputFilename);
+	  continue;
+	}
+
 	dup2(fd, 0);
 
       }
       //Check if we need to change the output to a file
       else if(outputFilename){  //Check if the filename pointer is not null (only if not a background) TODO: fix, bug?
         fd = open( outputFilename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+	if(fd < 0){
+          printf("Cannot open %s for output \n", outputFilename);
+	  continue;
+	}
 
         dup2(fd , 1);
 	
@@ -245,3 +247,10 @@ void signalSIGINTHandler(int signum){
   //Setup signal handler again
   signal(SIGINT, signalSIGINTHandler);
 }
+
+void signalSIGTERMHandler(int signum){
+  printf("terminated by signal %d\n", signum);
+
+  signal(SIGTERM, signalSIGTERMHandler);
+}
+
