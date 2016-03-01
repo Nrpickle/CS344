@@ -129,6 +129,11 @@ int main(){
     short userInputCount = 0;
 
     do{
+      if(userInputVect[userInputCount]){
+	free(userInputVect[userInputCount]);
+	userInputVect[userInputCount] = NULL;
+      }
+      
       userInputVect[userInputCount] = malloc( (strlen(tokResult) + 1) * sizeof(char) );
       strcpy( userInputVect[userInputCount++] , tokResult );
 
@@ -140,8 +145,15 @@ int main(){
     //Note: there are a lot of program flow breaking 'continues' used in this program
     //and especially in this part. I deemed it the most elegant way to solve the problem
 
-    if(!strcmp(userInputVect[0], "exit"))
+    if(!strcmp(userInputVect[0], "exit")){
+      //We need to do some memory cleanup before we exit
+      int tempCounter = 0;
+      do{
+        free(userInputVect[tempCounter]);
+      }while(userInputVect[++tempCounter] != NULL);
+      free(userInputVect);
       exit(0);
+    }
     if(!strcmp(userInputVect[0], "cd")){
       //For the next line, it is important to check for the first check first,
       //otherwise you could SEGMENTATION FAULT
@@ -246,9 +258,10 @@ int main(){
         
         if(fd < 0){
           printf("Cannot open %s for input \n", inputFilename);
+	  //free(inputFilename);
 	  continue;
 	}
-
+        //free(inputFilename);
 	dup2(fd, 0);
 
       }
@@ -258,8 +271,11 @@ int main(){
 
 	if(fd < 0){
           printf("Cannot open %s for output \n", outputFilename);
+	  //free(outputFilename);
 	  continue;
 	}
+
+	//free(outputFilename);
 
         dup2(fd , 1);
 	
