@@ -1,4 +1,4 @@
-/* Nick McComb
+/* Nick McComb | nickmccomb.net
  * CS344 - February 2016
  * 
  * Written for Operating Systems I
