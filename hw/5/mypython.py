@@ -8,14 +8,17 @@
 import sys
 import random
 
+#This function returns a random string
 def getRandomString():
-  filename = ''
+  randomStr = ''
   for i in range(10):
-    filename += str(unichr(random.randint(97, 122)))
-  return filename
+    randomStr += str(unichr(random.randint(97, 122)))
+  return randomStr
 
+#testing line
 #random.seed(7)
 
+#We want 4 random strings
 for i in range(1, 4):
   randomStr = getRandomString()
   f = open('file' + str(i), 'w')
@@ -23,10 +26,8 @@ for i in range(1, 4):
   print "Wrote " + randomStr + " to file" + str(i)
   f.close()
 
-int1 = random.randint(1, 43)
-int2 = random.randint(1, 43)
+int1 = random.randint(1, 42)
+int2 = random.randint(1, 42)
 print "Your first integer is:   " + str(int1)
 print "Your second integer is:  " + str(int2)
 print "The product of these is: " + str(int1*int2)
-
-#print getRandomString()
