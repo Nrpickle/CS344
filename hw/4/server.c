@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define ENCRYPT
+//#define ENCRYPT
 
 char convert(char input);
 
@@ -43,6 +43,10 @@ int main(int argc, char *argv[])
 	sizeof(serv_addr)) < 0) 
     error("ERROR on binding");
   do{
+    //KILL ALL ZOMBIES
+    static int status;
+    waitpid(-1, &status, WNOHANG);
+
     fprintf(stdout, "[Server: Listening to packets on %d]\n", portno);
     listen(sockfd,5); //Listen to the port
 
@@ -95,7 +99,6 @@ int main(int argc, char *argv[])
       //printf("Server plaintext: ");
 
       for(i = 0; i < strLen; ++i){
-	//printf("%d", (int) convert(plaintext[i]));
 	plaintextNumbers[i] = convert(plaintext[i]);
       }
 
@@ -116,9 +119,10 @@ int main(int argc, char *argv[])
       for (i = 0; i < strLen; ++i){
 #ifdef ENCRYPT
 	encryptedNumbers[i] = (plaintextNumbers[i] + keyNumbers[i]) % 27;
-#endif
-#ifdef DECRYPT
-	encryptedNumbers[i] = (plaintextNumbers[i] - keyNumbers[i]) % 27;
+#else  // DECRYPT
+	encryptedNumbers[i] = (plaintextNumbers[i] - keyNumbers[i]);
+	if(encryptedNumbers[i] < 0)  //Mod on this step didn't work, so I did it manually.
+	  encryptedNumbers[i] = encryptedNumbers[i] + 27;  //This 100% works though
 #endif
 	//printf("%d ", (int) encryptedNumbers[i]);
       }
