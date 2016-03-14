@@ -29,6 +29,7 @@ int main(int argc, char *argv[]){
 
   }
 
+  printf("\n"); //Puts a newline on the end of the file, because _apparently_ that's necessary (lol)
 
   return 0;
 }

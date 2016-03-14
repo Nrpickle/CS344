@@ -13,6 +13,13 @@ void error(const char *msg)
   exit(0);
 }
 
+int min(int a, int b){
+  if(a < b)
+    return a;
+  else
+    return b;
+}
+
 int main(int argc, char *argv[])
 {
   int sockfd, portno, n;
@@ -20,7 +27,7 @@ int main(int argc, char *argv[])
   struct hostent *server;
 
   //Input checking
-  char buffer[256];
+  char buffer[1005];
   if (argc != 4) {
     fprintf(stderr,"usage %s inputfile keyfile port\n", argv[0]);
     exit(0);
@@ -67,11 +74,14 @@ int main(int argc, char *argv[])
 
   //At this point we can assume we have valid files and a valid socket
 
-  char inputBuffer[2000];
-  char plaintext[2000];
-  char key[2000];
+  char * inputBuffer = malloc(sizeof(char) * 100000);
+  //char plaintext[2000];
+  //char key[2000];
 
   fgets(inputBuffer, 1000, plaintextFile);
+
+  char * plaintext  = malloc(sizeof(char) * (strlen(inputBuffer) + 1));
+  char * plaintextHead = plaintext;
 
   //I want to strip the newline off if there is one
   int plaintextLen = strlen(inputBuffer);
@@ -82,20 +92,47 @@ int main(int argc, char *argv[])
 
   strcpy(plaintext, inputBuffer);
 
+  printf("%s %s\n", plaintext, inputBuffer);
+
   fgets(inputBuffer, 1000, keyFile);
-  //printf("Keyfile       : %s\n\n", inputBuffer);
+
+  char * key = malloc(sizeof(char) * (strlen(inputBuffer) + 1));
+  char * keyHead = key;
 
   strcpy(key,       inputBuffer);
+
+  free(inputBuffer);
 
   //strcpy(plaintext, argv[1]);
   //strcpy(key,       argv[2]);
 
   //Write to the server
-  //TODO: Implement sending in chunks of 1000
-  bzero(buffer, 256);
-  n = write(sockfd, plaintext, strlen(plaintext));
-  if (n < 0)
-    error("ERROR writing to socket");
+
+  int plainToSend = 1;
+  int keyToSend = 1;
+
+  printf("%s\n", plaintext);
+
+  if (strlen(plaintext) > 1000) {
+    plainToSend += strlen(plaintext) / 1000;
+  }
+
+  if (strlen(key) > 1000) {
+    keyToSend += strlen(key) / 1000;
+  }
+
+  bzero(buffer, 1001);
+  do{
+    printf("plain to send: %d, string to send: %s\n", plainToSend, plaintext);
+    n = write(sockfd, plaintext, min(strlen(plaintext), 1000));
+    if (n < 0)
+      error("ERROR writing to socket");
+   
+    if(strlen(plaintext) > 1000)
+      plaintext = plaintext + 1000;
+    --plainToSend;
+  }while(plainToSend > 0);
+
 
   n = write(sockfd, key, strlen(key));
   if (n < 0)
@@ -106,5 +143,11 @@ int main(int argc, char *argv[])
     error("ERROR reading from socket");
   printf("%s\n",buffer);
   close(sockfd);
+
+  free(plaintextHead);
+  free(keyHead);
+
   return 0;
 }
+
+
