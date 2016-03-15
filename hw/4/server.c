@@ -22,9 +22,10 @@ int main(int argc, char *argv[])
 {
   int sockfd, newsockfd, portno;
   socklen_t clilen;
-  char buffer[256];
-  char plaintext[256];
-  char key[256];
+  char buffer[1005];
+  //char plaintext[256];
+
+  //char key[256];
   struct sockaddr_in serv_addr, cli_addr;
   int n;
   if (argc < 2) {
@@ -61,21 +62,21 @@ int main(int argc, char *argv[])
     if (newsockfd < 0)
       error("ERROR on accept");
 
-    
+
     pid_t spawnpid;
 
     spawnpid = fork();
 
     if(spawnpid == 0){  //If we are the parent, we want to continue
 
-/*
-      clilen = sizeof(cli_addr);
-      newsockfd = accept(sockfd, 
-	  (struct sockaddr *) &cli_addr, 
-	  &clilen);
-      if (newsockfd < 0) 
-	error("ERROR on accept");
-*/  
+      /*
+	 clilen = sizeof(cli_addr);
+	 newsockfd = accept(sockfd, 
+	 (struct sockaddr *) &cli_addr, 
+	 &clilen);
+	 if (newsockfd < 0) 
+	 error("ERROR on accept");
+	 */  
       //We have accepted a connection
       bzero(buffer,256);
 
@@ -83,13 +84,37 @@ int main(int argc, char *argv[])
       //if (n < 0) error("ERROR reading from socket");
       //printf("Here is the message: %s\n",buffer);
 
-      bzero(plaintext, 256);
-      n = read(newsockfd, plaintext, 255);
-      //printf("[Server: here is the plaintext: %s]\n", plaintext);
+      int plainToRec;
+      char tempBuffer[1002];
+      bzero(tempBuffer, 40);
+      n = read(newsockfd, tempBuffer, 40);
 
-      bzero(key, 256);
-      n = read(newsockfd, key, 255);
+      //printf("Server recieved for temp send: %d\n", atoi(tempBuffer));
+
+      int keyToRec = plainToRec = atoi(tempBuffer);
+
+      char * plaintext = malloc(sizeof(char) * 1000 * plainToRec);
+      strcpy(plaintext, "");
+
+      do{
+	bzero(tempBuffer, 1000);
+	n = read(newsockfd, tempBuffer, 1000);
+	strcat(plaintext, tempBuffer);
+      }while(--plainToRec > 0);
+      //printf("[Server: here is the plaintext: ###### %s ######]\n", plaintext);
+      //printf("Length of the plaintext: %d\n", strlen(plaintext));
+     
+      char * key = malloc(sizeof(char) * 1000 * keyToRec);
+      strcpy(key, "");
+
+      do{
+        bzero(tempBuffer, 1001);
+        n = read(newsockfd, tempBuffer, 1000);
+	strcat(key, tempBuffer);
+      }while(--keyToRec);
       //printf("[Server: here is the key: %s]\n", key);
+
+      //printf("Length of the key: %d\n", strlen(key));
 
       //Prep plaintext
       int strLen = strlen(plaintext);
@@ -102,7 +127,7 @@ int main(int argc, char *argv[])
 	plaintextNumbers[i] = convert(plaintext[i]);
       }
 
-      strLen = strlen(key);
+      strLen = strlen(plaintext);
       char * keyNumbers = malloc(sizeof(char) * strLen);
 
       //printf("\nServer key: ");
@@ -114,7 +139,7 @@ int main(int argc, char *argv[])
 
       //Process the encryption
       char * encryptedNumbers = malloc(sizeof(char) * strLen);
-      //printf("\nServer encrypt: ");
+      //printf("\nloop length: %d, Server encrypt: ", strLen);
 
       for (i = 0; i < strLen; ++i){
 #ifdef ENCRYPT
@@ -128,7 +153,7 @@ int main(int argc, char *argv[])
       }
 
       char * encrypted = malloc(sizeof(char) * strLen);
-      //printf("Server output: ");
+      //printf("\nServer output: ");
 
       for (i = 0; i < strLen; ++i){
 	//printf("%c", convert(encryptedNumbers[i]));

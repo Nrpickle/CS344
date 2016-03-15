@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h> 
-
+#include <string.h>
 void error(const char *msg)
 {
   perror(msg);
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
   //char plaintext[2000];
   //char key[2000];
 
-  fgets(inputBuffer, 1000, plaintextFile);
+  fgets(inputBuffer, 100000, plaintextFile);
 
   char * plaintext  = malloc(sizeof(char) * (strlen(inputBuffer) + 1));
   char * plaintextHead = plaintext;
@@ -92,9 +92,9 @@ int main(int argc, char *argv[])
 
   strcpy(plaintext, inputBuffer);
 
-  printf("%s %s\n", plaintext, inputBuffer);
+  //printf("%s %s\n", plaintext, inputBuffer);
 
-  fgets(inputBuffer, 1000, keyFile);
+  fgets(inputBuffer, 100000, keyFile);
 
   char * key = malloc(sizeof(char) * (strlen(inputBuffer) + 1));
   char * keyHead = key;
@@ -102,6 +102,9 @@ int main(int argc, char *argv[])
   strcpy(key,       inputBuffer);
 
   free(inputBuffer);
+
+  if(strlen(plaintext) > strlen(key))
+    error("Key is too short.");
 
   //strcpy(plaintext, argv[1]);
   //strcpy(key,       argv[2]);
@@ -111,32 +114,66 @@ int main(int argc, char *argv[])
   int plainToSend = 1;
   int keyToSend = 1;
 
-  printf("%s\n", plaintext);
+  //printf("%s\n", plaintext);
 
   if (strlen(plaintext) > 1000) {
     plainToSend += strlen(plaintext) / 1000;
   }
 
-  if (strlen(key) > 1000) {
-    keyToSend += strlen(key) / 1000;
-  }
+  //We can assume the key is longer than the plaintext, so we can make
+  //the following assumption:
+  keyToSend = plainToSend;
+  //if (strlen(key) > 1000) {
+  //  keyToSend += strlen(key) / 1000;
+  //}
+
+  char temp[40];
+
+  sprintf(temp, "%d", plainToSend);
+  //itoa(plainToSend, temp, 10);
+
+  //Send the amount of data to be transferred first
+  n = write(sockfd, temp, strlen(temp));
+  if(n < 0)
+    error("ERROR writing to socket");
+  int i; 
+  for(i = 0; i < 10000000; ++i)
+    continue;
+
+  //printf("CLIENT: Length of text to send: %d\n", strlen(plaintext));
 
   bzero(buffer, 1001);
   do{
-    printf("plain to send: %d, string to send: %s\n", plainToSend, plaintext);
+    //printf("plain to send: %d, string to send: %s\n", plainToSend, plaintext);
     n = write(sockfd, plaintext, min(strlen(plaintext), 1000));
     if (n < 0)
       error("ERROR writing to socket");
-   
+
     if(strlen(plaintext) > 1000)
       plaintext = plaintext + 1000;
     --plainToSend;
+
+    for(i = 0; i < 100000700; ++i)
+      continue;
+
   }while(plainToSend > 0);
 
+  for(i = 0; i < 10000000; ++i)
+    continue;
 
-  n = write(sockfd, key, strlen(key));
-  if (n < 0)
-    error("[! ERROR writing to socket !]");
+  bzero(buffer, 1001);
+  do{
+    n = write(sockfd, key, strlen(key));
+    if (n < 0)
+      error("[! ERROR writing to socket !]");
+
+    if(strlen(key) > 1000)
+      key = key + 1000;
+    --keyToSend;
+
+    for(i = 0; i < 10000000; ++i)
+      continue;
+  }while(keyToSend > 0);
 
   n = read(sockfd,buffer,255);
   if (n < 0) 
