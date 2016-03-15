@@ -31,7 +31,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define ENCRYPT
+//#define ENCRYPT
 
 char convert(char input);
 

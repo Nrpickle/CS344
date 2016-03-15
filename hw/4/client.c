@@ -1,3 +1,23 @@
+/* Client base code
+ *
+ * Note: This exact code is used for both of the local clients, as it's code is exactly the same. This would
+ * still be true if the identification of each program was implemented, even though it was not.
+ *
+ * Nick McComb | www.nickmccomb.net
+ * Written March 2016 for Operating Systems I
+ *
+ * ALGORITHM:
+ *
+ * 1. VERIFY INPUT
+ * 2. READ IN INPUT FROM FILES SPECIFIED BY USER
+ * 3. SEND INPUT TO PROCESS SCRIPT
+ * 4. OUTPUT RECIEVED INFO FROM PROCESS Script
+ *
+ * Usage: [exename] inputfile keyfile port
+ *
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -113,6 +133,7 @@ int main(int argc, char *argv[])
 
   int plainToSend = 1;
   int keyToSend = 1;
+  int cypherToRec = 1;
 
   //printf("%s\n", plaintext);
 
@@ -122,7 +143,7 @@ int main(int argc, char *argv[])
 
   //We can assume the key is longer than the plaintext, so we can make
   //the following assumption:
-  keyToSend = plainToSend;
+  cypherToRec = keyToSend = plainToSend;
   //if (strlen(key) > 1000) {
   //  keyToSend += strlen(key) / 1000;
   //}
@@ -132,7 +153,8 @@ int main(int argc, char *argv[])
   sprintf(temp, "%d", plainToSend);
   //itoa(plainToSend, temp, 10);
 
-  //Send the amount of data to be transferred first
+  //Write the number of thousands of plaintext (ceil) that is going to be sent,
+  //so that the daemon knows what to expect
   n = write(sockfd, temp, strlen(temp));
   if(n < 0)
     error("ERROR writing to socket");
@@ -142,9 +164,10 @@ int main(int argc, char *argv[])
 
   //printf("CLIENT: Length of text to send: %d\n", strlen(plaintext));
 
+  //Send the plaintext in chunks of 1000
   bzero(buffer, 1001);
   do{
-    //printf("plain to send: %d, string to send: %s\n", plainToSend, plaintext);
+    //printf("plain to send: %d, string to send\n", plainToSend);
     n = write(sockfd, plaintext, min(strlen(plaintext), 1000));
     if (n < 0)
       error("ERROR writing to socket");
@@ -153,7 +176,7 @@ int main(int argc, char *argv[])
       plaintext = plaintext + 1000;
     --plainToSend;
 
-    for(i = 0; i < 100000700; ++i)
+    for(i = 0; i < 10000700; ++i)
       continue;
 
   }while(plainToSend > 0);
@@ -161,24 +184,31 @@ int main(int argc, char *argv[])
   for(i = 0; i < 10000000; ++i)
     continue;
 
+  //Send the key in chunks of 1000
   bzero(buffer, 1001);
   do{
-    n = write(sockfd, key, strlen(key));
+    //printf("Wrote key %d with value %d\n", keyToSend, n);
+    n = write(sockfd, key, min(strlen(key), 1000));
     if (n < 0)
       error("[! ERROR writing to socket !]");
 
     if(strlen(key) > 1000)
       key = key + 1000;
     --keyToSend;
-
     for(i = 0; i < 10000000; ++i)
       continue;
   }while(keyToSend > 0);
 
-  n = read(sockfd,buffer,255);
-  if (n < 0) 
-    error("ERROR reading from socket");
-  printf("%s\n",buffer);
+  //printf("Waiting for response... \n");
+
+  //Recieve the reply in chunks of 1000
+  do{
+    n = read(sockfd,buffer,1000);
+    if (n < 0) 
+      error("ERROR reading from socket");
+    printf("%s", buffer);
+  }while(--cypherToRec > 0);
+  printf("\n");
   close(sockfd);
 
   free(plaintextHead);
